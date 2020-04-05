@@ -9,8 +9,9 @@ Hence the programm is able to inject some arbitrary code inside the running appl
 
 ## How it works :
 - https://youtu.be/yuqg0Wx2KZ4
-- [This document is to give you an idea behind each of the function i am using](./FunctionsDescriptor.pdf)
-
+> The video present the main and show a demo
+- [Function descriptor](./FunctionsDescriptor.pdf)
+> This document is to give you an idea behind each of the function i am using
 
 ## To run the program
 - make ic **or** make tr
