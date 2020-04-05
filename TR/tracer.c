@@ -13,9 +13,14 @@
 	is because i use them in several functions and this avoid to declare them many
 	time
 *******************************************************************************/
-static FILE* fd;
+/* Byte code instruction of a breakpoint */
 static const unsigned char bp = 0xCC;
+
+/* Length of the pid to malloc the right amount of memory */
 static size_t tracee_pid_len;
+
+/* File descriptor that will be use to get the result of bash command */
+static FILE* fd;
 
 /*
 	Return the pid of the processus specify
@@ -187,89 +192,6 @@ static unsigned long get_libc_function_address(const pid_t tracee_pid,
 
 	return libc_function_address;
 
-}
-
-
-/*
-	Call the function at the address specify by function_to_call_address by the
-	way of a jump instruction and a end instruction
-	the specify function should takes an integer as parameter
-	Parameter : pid -> pid of the tracee
-							running_function -> address of the function currently running
-							function_to_call_address -> address of the function to call
-							parameter -> the parameter of the function called
-*/
-static void trampoline(const pid_t pid, const unsigned long running_function,
-							         const unsigned long function_to_call_address,
-						 	         const int parameter)
-{
-
-	struct user_regs_struct regs;
-	int wstatus;
-
-	unsigned char jump[2]={0x48,0xB8};
-	unsigned char endi[3]={0xFF,0xE0,0xC3};
-
-	// get the memory file of the process
-	const size_t mem_len = strlen("/proc//mem") + tracee_pid_len;
-	char * mem = malloc(sizeof(char) * mem_len);
-	snprintf(mem, sizeof(char) * mem_len,"/proc/%d/mem",pid);
-	if(NULL == (fd = fopen(mem,"r+"))){
-		fprintf(stderr,"Can't open file at line %d\n",__LINE__);
-	}
-
-	fseek(fd, (long)running_function, SEEK_SET);
-	/* Need to put a breakpoint inside the running function address to get the
-																								right value for the registers */
-	if(fwrite(&bp,1,1,fd) != 1){
-		fprintf(stderr,"Failed to write the code at line %d\n",__LINE__);
-	}
-	// close the file to apply the modification
-	fclose(fd);
-
-	/* Restart the process with the breakpoint inside the running funcion */
-	if(ptrace(PTRACE_CONT,pid,NULL,NULL) < 0){
-		fprintf(stderr,"Fail to restart the processus at line %d\n",__LINE__);
-	}
-	if(pid != waitpid(pid,&wstatus,WCONTINUED)){
-		fprintf(stderr,"Error waipid at line %d\n",__LINE__);
-	}
-
-	/* get the value of the registers's processus while the program  is trapped
-		 in the execution of f1 */
-
-	if(ptrace(PTRACE_GETREGS,pid,NULL,&regs) < 0){
-		fprintf(stderr,"Fail to get the registers at line %d\n",__LINE__);
-	}
-
-	/* Set the new value for the registers */
-	regs.rip = running_function;
-	regs.rdi = (unsigned long)parameter;
-
-	if(ptrace(PTRACE_SETREGS,pid,NULL,&regs) < 0){
-		fprintf(stderr,"Fail to set the registers at line %d\n",__LINE__);
-	}
-
-	/* Open the memory to write the code in it */
-	if(NULL == (fd = fopen(mem,"r+"))){
-		fprintf(stderr,"Can't open file at line %d\n",__LINE__);
-	}
-
-	fseek(fd, (long)running_function, SEEK_SET);
-	/* Start to write the jump instruction in the begining of the running function */
-	if(fwrite(jump,sizeof(char)*sizeof(jump),1,fd) == 0){
-		fprintf(stderr,"Failed to inject the code at line %d\n",__LINE__);
-	}
-	/* Then write the address that we want to call */
-	if(fwrite(&function_to_call_address,6,1,fd) == 0){
-		fprintf(stderr,"Failed to inject the code at line %d\n",__LINE__);
-	}
-	/* Finally write the ending instruction */
-	if(fwrite(endi,sizeof(char)*sizeof(endi),1,fd) == 0){
-		fprintf(stderr,"Failed to inject the code at line %d\n",__LINE__);
-	}
-	fclose(fd);
-	free(mem);
 }
 
 
@@ -564,12 +486,6 @@ static int get_function_size(const char* function_name, const char* prog_name){
 	return result;
 }
 
-/* Dummy function for the injection */
-static int virus(int param){
-	param *= 1000;
-	return param;
-}
-
 
 /*
 	Call mprotect in the tracee and return the return value of mprotect
@@ -696,6 +612,91 @@ static void call_mprotect(const pid_t pid,
 	free(backup);
 }
 
+
+
+/*
+	Call the function at the address specify by function_to_call_address by the
+	way of a jump instruction and a end instruction
+	the specify function should takes an integer as parameter
+	Parameter : pid -> pid of the tracee
+							running_function -> address of the function currently running
+							function_to_call_address -> address of the function to call
+							parameter -> the parameter of the function called
+*/
+static void trampoline(const pid_t pid, const unsigned long running_function,
+							         const unsigned long function_to_call_address,
+						 	         const int parameter)
+{
+
+	struct user_regs_struct regs;
+	int wstatus;
+
+	unsigned char jump[2]={0x48,0xB8};
+	unsigned char endi[3]={0xFF,0xE0,0xC3};
+
+	// get the memory file of the process
+	const size_t mem_len = strlen("/proc//mem") + tracee_pid_len;
+	char * mem = malloc(sizeof(char) * mem_len);
+	snprintf(mem, sizeof(char) * mem_len,"/proc/%d/mem",pid);
+	if(NULL == (fd = fopen(mem,"r+"))){
+		fprintf(stderr,"Can't open file at line %d\n",__LINE__);
+	}
+
+	fseek(fd, (long)running_function, SEEK_SET);
+	/* Need to put a breakpoint inside the running function address to get the
+																								right value for the registers */
+	if(fwrite(&bp,1,1,fd) != 1){
+		fprintf(stderr,"Failed to write the code at line %d\n",__LINE__);
+	}
+	// close the file to apply the modification
+	fclose(fd);
+
+	/* Restart the process with the breakpoint inside the running funcion */
+	if(ptrace(PTRACE_CONT,pid,NULL,NULL) < 0){
+		fprintf(stderr,"Fail to restart the processus at line %d\n",__LINE__);
+	}
+	if(pid != waitpid(pid,&wstatus,WCONTINUED)){
+		fprintf(stderr,"Error waipid at line %d\n",__LINE__);
+	}
+
+	/* get the value of the registers's processus while the program  is trapped
+		 in the execution of f1 */
+
+	if(ptrace(PTRACE_GETREGS,pid,NULL,&regs) < 0){
+		fprintf(stderr,"Fail to get the registers at line %d\n",__LINE__);
+	}
+
+	/* Set the new value for the registers */
+	regs.rip = running_function;
+	regs.rdi = (unsigned long)parameter;
+
+	if(ptrace(PTRACE_SETREGS,pid,NULL,&regs) < 0){
+		fprintf(stderr,"Fail to set the registers at line %d\n",__LINE__);
+	}
+
+	/* Open the memory to write the code in it */
+	if(NULL == (fd = fopen(mem,"r+"))){
+		fprintf(stderr,"Can't open file at line %d\n",__LINE__);
+	}
+
+	fseek(fd, (long)running_function, SEEK_SET);
+	/* Start to write the jump instruction in the begining of the running function */
+	if(fwrite(jump,sizeof(char)*sizeof(jump),1,fd) == 0){
+		fprintf(stderr,"Failed to inject the code at line %d\n",__LINE__);
+	}
+	/* Then write the address that we want to call */
+	if(fwrite(&function_to_call_address,6,1,fd) == 0){
+		fprintf(stderr,"Failed to inject the code at line %d\n",__LINE__);
+	}
+	/* Finally write the ending instruction */
+	if(fwrite(endi,sizeof(char)*sizeof(endi),1,fd) == 0){
+		fprintf(stderr,"Failed to inject the code at line %d\n",__LINE__);
+	}
+	fclose(fd);
+	free(mem);
+}
+
+
 /*
 	Get content from the memory of a running program and store it the array data
 	Parameter : pid -> pid of the running program
@@ -755,13 +756,14 @@ static void putdata(const pid_t pid, const unsigned long address_to_write,
 	fclose(fd);
 }
 
+
 /*
 	Check if the address specify is in an executable memory block of the heap
 	Return 1 if true, 0 otherwise.
 	Parameter : pid -> pid of the process that we will check the heap
 	            address -> address to check
 */
-int isAddrInHeap(pid_t pid, unsigned long address){
+static int isAddrInHeap(pid_t pid, unsigned long address){
 	int result = 0;
 
 	const size_t maps_len = strlen("cat /proc//maps") + tracee_pid_len;
@@ -779,7 +781,10 @@ int isAddrInHeap(pid_t pid, unsigned long address){
 	int find = 0;
 	do
 	{
-		fgets(start,128,fd);
+		/* Check if we went trought all the line of the maps*/
+		if(fgets(start,128,fd) == NULL){
+			find = -1;
+		}
 		/* Check if "*rwxp*heap" is present */
 		if((strstr(start,"rwxp") != NULL) && (strstr(start,"heap") != NULL)){
 			/* Get the base address of the executable heap */
@@ -791,16 +796,26 @@ int isAddrInHeap(pid_t pid, unsigned long address){
 	}
 	while(find==0);
 
-	if ((unsigned long)strtol(start,NULL,16) <= address &&
-			(unsigned long)strtol(end,NULL,16) >= address )
-	{
-		result = 1;
+	if(find == 1){
+		/* Check if the address specify is between the start and the end addresses */
+		if ((unsigned long)strtol(start,NULL,16) <= address &&
+				(unsigned long)strtol(end,NULL,16) >= address )
+		{
+			result = 1;
+		}
 	}
+
 	free(maps);
 	free(start);
 	fclose(fd);
 
 	return result;
+}
+
+/* Dummy function for the injection */
+static int virus(int param){
+	param *= 1000;
+	return param;
 }
 
 

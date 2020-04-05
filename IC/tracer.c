@@ -13,9 +13,14 @@
 	is because i use them in sevaral function and this avoid to declare them many
 	time
 *******************************************************************************/
-static FILE* fd;
+/* Byte code instruction of a breakpoint */
 static const unsigned char bp = 0xCC;
+
+/* Length of the pid to malloc the right amount of memory */
 static size_t tracee_pid_len;
+
+/* File descriptor that will be use to get the result of bash command */
+static FILE* fd;
 
 /*
 	Return the pid of the processus specify
@@ -257,16 +262,16 @@ static int call_func(const pid_t pid, const unsigned long running_function,
 	if(ptrace(PTRACE_SETREGS,pid,NULL,&regs) < 0){
 		fprintf(stderr,"Fail to set the registers at line %d\n",__LINE__);
 	}
-	//printf("**NEW**\nrax : %llx, rip : %llx\n", regs.rax,regs.rip);
+
 
 	/* Open the memory to write the code in it */
 	if(NULL == (fd = fopen(mem,"r+"))){
 		fprintf(stderr,"Can't open file at line %d\n",__LINE__);
 	}
 	fseek(fd, (long)running_function, SEEK_SET);
-	// inject the code
+
+	/* Write the content of the array code at the begining of the running function*/
 	if(fwrite(code,sizeof(char)*strlen((char*)code),1,fd) == 0){
-		//printf("injection du breakpoint\n");
 		fprintf(stderr,"Failed to inject the code at line %d\n",__LINE__);
 	}
 	fclose(fd);
@@ -807,8 +812,8 @@ static void putdata(const pid_t pid, const unsigned long address_to_write,
 		fprintf(stderr,"Can't open file at line %d\n",__LINE__);
 	}
 	fseek(fd, (long)address_to_write, SEEK_SET);
-	unsigned char * temp = malloc(sizeof(char) * size);
-	fread(temp, sizeof(char) * size, 1, fd);
+	unsigned char * temp = malloc(sizeof(char) * (size_t)size);
+	fread(temp, sizeof(char) * (size_t)size, 1, fd);
 	fseek(fd, (long)address_to_write, SEEK_SET);
 	for(int i =0; i < size; i++){
 		printf("%02x ", temp[i]);
@@ -948,7 +953,7 @@ static void call_free(const pid_t pid,
 	Parameter : pid -> pid of the process that we will check the heap
 	            address -> address to check
 */
-int isAddrInHeap(pid_t pid, unsigned long address){
+static int isAddrInHeap(pid_t pid, unsigned long address){
 	int result = 0;
 
 	const size_t maps_len = strlen("cat /proc//maps") + tracee_pid_len;
@@ -966,7 +971,10 @@ int isAddrInHeap(pid_t pid, unsigned long address){
 	int find = 0;
 	do
 	{
-		fgets(start,128,fd);
+		/* Check if we went trought all the line of the maps*/
+		if(fgets(start,128,fd) == NULL){
+			find = -1;
+		}
 		/* Check if "*rwxp*heap" is present */
 		if((strstr(start,"rwxp") != NULL) && (strstr(start,"heap") != NULL)){
 			/* Get the base address of the executable heap */
@@ -976,14 +984,18 @@ int isAddrInHeap(pid_t pid, unsigned long address){
 			find = 1;
 		}
 	}
-	while(find==0);
+	while(find == 0);
 
-	if ((unsigned long)strtol(start,NULL,16) <= address &&
-			(unsigned long)strtol(end,NULL,16) >= address )
-	{
-		result = 1;
-		printf("Address 0x%lx is in an executable block of the heap\n", address);
+	if(find == 1){
+		/* Check if the address specify is between the start and the end addresses */
+		if ((unsigned long)strtol(start,NULL,16) <= address &&
+				(unsigned long)strtol(end,NULL,16) >= address )
+		{
+			result = 1;
+			printf("Address 0x%lx is in an executable block of the heap\n", address);
+		}
 	}
+
 	free(maps);
 	free(start);
 	fclose(fd);
