@@ -1,4 +1,4 @@
-# CodeInjection
+# Code Injection using ptrace
 
 This is a master project about code injection using ptrace.
 The goal of this project is to make a program that can modify a running application on the fly.
@@ -17,6 +17,7 @@ Or if you want to run it with you own tracee
 
 - run the tracee
 - sudo tracer [process name] [function name]
+
 > *The processus secify need to be run before the execution of the tracer.*
 > *The function specify need to be an existing function in the tracee.*
 
