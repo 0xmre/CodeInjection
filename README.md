@@ -10,5 +10,13 @@ Hence the programm is able to inject some arbitrary code inside the running appl
 
 
 ## To run the program
-- make ic -> This command will compile the code for the indirect call version and run the tracee
-- make tr -> This command will compile the code for the trampoline version and run the tracee
+- make ic or make tr
+- make run 
+
+Or if you want to run it with you own tracee
+
+- run the tracee
+- sudo tracer [process name] [function name]
+
+*Note that the injected function take as parameter an integer and return an integer.
+If you wish to change its purpose you can modify the call_func() function inside tracer.c and change the type of the parameter name 'parameter' and also the return type of the function.*
