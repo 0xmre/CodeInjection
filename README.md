@@ -12,7 +12,7 @@ Hence the programm is able to inject some arbitrary code inside the running appl
 
 
 ## To run the program
-- make ic or make tr
+- make ic **or** make tr
 - make run 
 
 Or if you want to run it with you own tracee
