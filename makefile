@@ -12,12 +12,12 @@ run:
 	cd bin ; $(TRACER) tracee f1
 
 ic:
-	$(CC) $(CFLAGS) ./IC/tracer.c -o bin/tracer
+	$(CC) $(CFLAGS) ./IndirectCall/tracer.c -o bin/tracer
 	$(CC) $(CFLAGS) ./tracee/tracee.c -o bin/tracee
 	$(TRACEE)
 
 tr:
-	$(CC) $(CFLAGS) ./TR/tracer.c -o bin/tracer
+	$(CC) $(CFLAGS) ./Trampoline/tracer.c -o bin/tracer
 	$(CC) $(CFLAGS) ./tracee/tracee.c -o bin/tracee
 	$(TRACEE)
 
