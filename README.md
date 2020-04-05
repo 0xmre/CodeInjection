@@ -14,13 +14,13 @@ Hence the programm is able to inject some arbitrary code inside the running appl
 > This document is to give you an idea behind each of the function i am using
 
 ## To run the program
-- make ic **or** make tr
-- make run 
+- `make ic` **or** `make tr`
+- `make run`
 
 Or if you want to run it with you own tracee
 
 - run the tracee
-- sudo tracer `process name` `function name`
+- sudo `tracer process name function name`
 
 > *The processus secify need to be run before the execution of the tracer.*
 > *The function specify need to be an existing function in the tracee.*
